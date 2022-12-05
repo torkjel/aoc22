@@ -4,32 +4,37 @@ using System.Linq;
 
 public static class Aoc05 {
 
+    private static readonly bool CM9000 = false;
+    private static readonly bool CM9001 = true;
+
     public static void Main(string[] args) {
         var input = Console.In;
         var stacks = ParseStacks(input);
         var _ = input.ReadLine();
         var moves = ParseMoves(input);
 
-        Console.WriteLine(Solve(stacks, moves));
+        var solver = curry<Seq<Seq<char>>, Seq<(int, int, int)>, bool, char[]>(Solve)(stacks)(moves);
+        Seq(CM9000, CM9001).Map(solver).ToList().ForEach(Console.WriteLine);
     }
 
-    public static char[] Solve(Seq<Seq<char>> stacks, Seq<(int n, int src, int dst)> moves) =>
-        Moves(stacks, moves).Map(s => s.Head()).ToArray();
+    public static char[] Solve(Seq<Seq<char>> stacks, Seq<(int n, int src, int dst)> moves, bool keepOrder) =>
+        Moves(stacks, moves, keepOrder).Map(s => s.Head()).ToArray();
 
-    public static Seq<Seq<char>> Move(Seq<Seq<char>> stacks, (int, int src, int dst) move) {
+    public static Seq<Seq<char>> MoveN(Seq<Seq<char>> stacks, (int n, int src, int dst) move, bool keepOrder) {
         var stacksArr = stacks.ToArray();
         var srcStack = stacksArr[move.src];
-        stacksArr[move.src] = srcStack.Tail().ToSeq();
-        stacksArr[move.dst] = srcStack.Head().Cons(stacksArr[move.dst]);
+        var moved = srcStack.Take(move.n);
+        stacksArr[move.src] = srcStack.Skip(move.n).ToSeq();
+        stacksArr[move.dst] = (keepOrder ? moved : moved.Rev()).Concat(stacksArr[move.dst]);
         return stacksArr.ToSeq();
     }
 
     public static Seq<Seq<char>> Moves(
         Seq<Seq<char>> stacks,
-        Seq<(int n, int src, int dst)> moves
+        Seq<(int n, int src, int dst)> moves,
+        bool keepOrder
     ) => moves.ToArray() switch {
-        [(0, _, _), ..var t] => Moves(stacks, t.ToSeq()),
-        [var move, ..var t]  => Moves(Move(stacks, move), (move.n - 1, move.src, move.dst).Cons(t)),
+        [var move, ..var t]  => Moves(MoveN(stacks, move, keepOrder), t.ToSeq(), keepOrder),
         [] => stacks
     };
 
